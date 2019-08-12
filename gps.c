@@ -17,23 +17,32 @@
 ** this program; if not, write to the Free Software Foundation, Inc., 59
 ** Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 **/
-
 #include <errno.h>
-#include <pthread.h>
-#include <termios.h>
 #include <fcntl.h>
-#include <sys/epoll.h>
 #include <math.h>
 #include <time.h>
 #include <signal.h>
+
+#ifndef GPS_TESTER
+
+#include <termios.h>
+#include <pthread.h>
+#include <sys/epoll.h>
 #include <unistd.h>
 
+#endif // GPS_TESTER
+
 #define  LOG_TAG  "gps_serial"
+
+#include <hardware/gps.h>
+
+#ifndef GPS_TESTER
 
 #include <cutils/log.h>
 #include <cutils/sockets.h>
 #include <cutils/properties.h>
-#include <hardware/gps.h>
+
+#endif // GPS_TESTER
 
 #if (12 <= __ANDROID_API__) || defined(_BSD_SOURCE) || defined(_SVID_SOURCE) || defined(_DEFAULT_SOURCE)
     #define _USE_TIMEGM
@@ -73,6 +82,13 @@ extern bool gps_power_off();
 //static void gps_dev_stop(int fd);
 
 static void gps_dev_set_meas_rate(int fd, unsigned short period_ms);
+
+#ifdef GPS_TESTER
+
+struct tm *gmtime_r(const time_t *timep, struct tm *result) { result = gmtime(timep); return result; }
+int gettimeofday(struct timeval *tv, struct timezone *tz) { tv->tv_sec = (long) time(NULL); tv->tv_usec = 0; return 0; }
+
+#endif // GPS_TESTER
 
 /*****************************************************************/
 /*****************************************************************/
@@ -121,7 +137,7 @@ nmea_tokenizer_init( NmeaTokenizer*  t, const char*  p, const char*  end )
     while (p < end) {
         const char*  q = p;
 
-        q = memchr(p, ',', end-p);
+        q = (const char *) memchr(p, ',', end-p);
         if (q == NULL)
             q = end;
 
@@ -304,7 +320,7 @@ nmea_reader_init( NmeaReader*  r )
     //nmea_reader_update_utc_diff( r );
 }
 
-
+/*
 static void
 nmea_reader_set_callback( NmeaReader*  r, gps_location_callback  cb )
 {
@@ -315,13 +331,11 @@ nmea_reader_set_callback( NmeaReader*  r, gps_location_callback  cb )
         r->fix.flags = 0;
     }
 }
-
+*/
 
 static int
 nmea_reader_update_time( NmeaReader*  r, Token  tok, time_t *gmt )
 {
-    int        hour, minute;
-    double     seconds;
     struct tm  tm;
 
     if (tok.p + 6 > tok.end)
@@ -386,8 +400,10 @@ nmea_reader_update_date( NmeaReader*  r, Token  date_tok, Token  time_tok )
         if (dif < -time_sync || time_sync < dif)
         {
             D("System time synchronized with the GPS");
+        #ifndef GPS_TESTER
             struct timeval tv = { gmt, 0 };
             settimeofday(&tv, NULL);
+        #endif
         }
     }
 
@@ -446,7 +462,6 @@ nmea_reader_update_altitude( NmeaReader*  r,
                              Token        altitude,
                              Token        units )
 {
-    //double  alt;
     Token   tok = altitude;
 
     if (tok.p >= tok.end)
@@ -459,7 +474,6 @@ nmea_reader_update_altitude( NmeaReader*  r,
 
 static int nmea_reader_update_accuracy(NmeaReader* r, Token accuracy, bool is_fix)
 {
-    //double  acc;
     Token   tok = accuracy;
 
     if (tok.p >= tok.end)
@@ -479,14 +493,13 @@ static int
 nmea_reader_update_bearing( NmeaReader*  r,
                             Token        bearing )
 {
-    //double  alt;
     Token   tok = bearing;
 
     if (tok.p >= tok.end)
-        return -1;
+            return -1;
 
     r->fix.flags   |= GPS_LOCATION_HAS_BEARING;
-    r->fix.bearing  = str2float(tok.p, tok.end);
+        r->fix.bearing  = (float) str2float(tok.p, tok.end);
     return 0;
 }
 
@@ -495,7 +508,6 @@ static int
 nmea_reader_update_speed( NmeaReader*  r,
                           Token        speed )
 {
-    //double  alt;
     Token   tok = speed;
 
     if (tok.p >= tok.end)
@@ -515,9 +527,9 @@ nmea_reader_update_svs( NmeaReader*  r, int inview, int num, int i, Token prn, T
     i = (num - 1)*4 + i;
     if (i < inview) {
         r->sv_status.sv_list[i].prn=str2int(prn.p,prn.end);
-        r->sv_status.sv_list[i].elevation=str2int(elevation.p,elevation.end);
-        r->sv_status.sv_list[i].azimuth=str2int(azimuth.p,azimuth.end);
-        r->sv_status.sv_list[i].snr=str2int(snr.p,snr.end);
+        r->sv_status.sv_list[i].elevation=(float)str2int(elevation.p,elevation.end);
+        r->sv_status.sv_list[i].azimuth=(float)str2int(azimuth.p,azimuth.end);
+        r->sv_status.sv_list[i].snr=(float)str2int(snr.p,snr.end);
         for (o=0;o<12;o++){
             if (id_in_fixed[o]==str2int(prn.p,prn.end)){
                 prnid = str2int(prn.p, prn.end);
@@ -794,6 +806,7 @@ nmea_reader_addc( NmeaReader*  r, int  c )
     }
 }
 
+#ifndef GPS_TESTER
 
 /*****************************************************************/
 /*****************************************************************/
@@ -883,7 +896,7 @@ epoll_register( int  epoll_fd, int  fd )
     return ret;
 }
 
-
+/*
 static int
 epoll_deregister( int  epoll_fd, int  fd )
 {
@@ -893,7 +906,7 @@ epoll_deregister( int  epoll_fd, int  fd )
     } while (ret < 0 && errno == EINTR);
     return ret;
 }
-
+*/
 
 /* this is the main thread, it waits for commands from gps_state_start/stop and,
  * when started, messages from the QEMU GPS daemon. these are simple NMEA sentences
@@ -952,14 +965,16 @@ gps_state_thread( void*  arg )
                             D("GPS thread starting  location_cb=%p", state->callbacks->location_cb);
                             started = 1;
                             update_gps_status(GPS_STATUS_SESSION_BEGIN);
-                            gps_dev_set_meas_rate(state->fd, period_in_ms);
+                            if (period_in_ms)
+                                gps_dev_set_meas_rate(state->fd, period_in_ms);
                         }
                     } else if (cmd == CMD_STOP) {
                         if (started) {
                             D("GPS thread stopping");
                             started = 0;
                             update_gps_status(GPS_STATUS_SESSION_END);
-                            gps_dev_set_meas_rate(state->fd, GPS_DEV_SLOW_UPDATE_RATE * 1000);
+                            if (period_in_ms)
+                                gps_dev_set_meas_rate(state->fd, GPS_DEV_SLOW_UPDATE_RATE * 1000);
                         }
                     }
                 } else if (fd == gps_fd) {
@@ -1022,7 +1037,7 @@ gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
 
     D("GPS will read from %s", device);
 
-    period_in_ms = GPS_DEV_HIGH_UPDATE_RATE * 1000;
+    period_in_ms = 0;
     if (property_get("ro.kernel.android.gps.max_rate", prop, "") != 0)
     {
         unsigned long rate = strtoul(prop, NULL, 10);
@@ -1034,7 +1049,7 @@ gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
 
     D("measure rate is set to %u ms", period_in_ms);
 
-    time_sync = false;
+    time_sync = 0;
     if (property_get("ro.kernel.android.gps.time_sync", prop, "") != 0)
     {
         time_sync = atol(prop);
@@ -1078,7 +1093,8 @@ gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
         tcsetattr( state->fd, TCSANOW, &ios );
     }
 
-    gps_dev_set_meas_rate(state->fd, GPS_DEV_SLOW_UPDATE_RATE * 1000);
+    if (period_in_ms)
+        gps_dev_set_meas_rate(state->fd, GPS_DEV_SLOW_UPDATE_RATE * 1000);
 
     if ( socketpair( AF_LOCAL, SOCK_STREAM, 0, state->control ) < 0 ) {
         ALOGE("Could not create thread control socket pair: %s", strerror(errno));
@@ -1404,3 +1420,5 @@ struct hw_module_t HAL_MODULE_INFO_SYM = {
     .author = "Keith Conger",
     .methods = &gps_module_methods,
 };
+
+#endif // GPS_TESTER
