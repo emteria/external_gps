@@ -10,7 +10,7 @@ include $(CLEAR_VARS)
 LOCAL_PRELINK_MODULE := false
 LOCAL_MODULE_PATH := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 LOCAL_SHARED_LIBRARIES := liblog libcutils
-LOCAL_MODULE := gps.rpi3
+LOCAL_MODULE := gps.$(TARGET_BOARD_PLATFORM)
 LOCAL_MODULE_TAGS := optional
 LOCAL_SRC_FILES := gps.c
 LOCAL_CFLAGS := -Wno-unused-parameter -Wno-unused-function
