@@ -1,0 +1,23 @@
+// Copyright (C) 2011 The Android-x86 Open Source Project
+
+cc_library_shared {
+    name: "gps.defaut",
+    proprietary: true,
+    relative_install_path: "hw",
+    srcs: [
+        "power-stub.c",
+        "gps.c",
+    ],
+    cflags: [
+        "-Wno-unused-parameter",
+        "-Wno-unused-function",
+    ],
+    shared_libs: [
+        "liblog",
+        "libcutils",
+    ],
+    header_libs: [
+        "libhardware_headers",
+        "libutils_headers",
+    ],
+}

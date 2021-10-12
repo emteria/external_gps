@@ -23,20 +23,16 @@
 #include <time.h>
 #include <signal.h>
 
+#define  LOG_TAG  "gps_serial"
+
+#include <hardware/gps.h>
+
 #ifndef GPS_TESTER
 
 #include <termios.h>
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <unistd.h>
-
-#endif // GPS_TESTER
-
-#define  LOG_TAG  "gps_serial"
-
-#include <hardware/gps.h>
-
-#ifndef GPS_TESTER
 
 #include <cutils/log.h>
 #include <cutils/sockets.h>
@@ -1007,8 +1003,6 @@ gps_state_init( GpsState*  state, GpsCallbacks* callbacks )
 {
     char   prop[PROPERTY_VALUE_MAX];
     char   device[256];
-    int    ret;
-    int    done = 0;
 
     struct sigevent tmr_event;
 
