@@ -2,26 +2,19 @@
 
 cc_library_shared {
     name: "gps.default",
-    proprietary: true,
     relative_install_path: "hw",
-    srcs: [
-        "power-stub.c",
-        "gps.c",
-    ],
-    cflags: [
-        "-Wno-unused-parameter",
-        "-Wno-unused-function",
-    ],
+    proprietary: true,
+    srcs: ["gps.c"],
     include_dirs: [
         "hardware/libhardware/include",
         "system/core/libsystem/include",
     ],
     shared_libs: [
-        "liblog",
         "libcutils",
+        "liblog",
     ],
-    header_libs: [
-        "libhardware_headers",
-        "libutils_headers",
+    cflags: [
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
     ],
 }
